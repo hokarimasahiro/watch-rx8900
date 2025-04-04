@@ -104,6 +104,8 @@ function 時計処理 () {
         時刻表示(0)
     } else {
         basic.clearScreen()
+        watchfont.showSorobanNumber(rtc.getClockData(clockData.hour), 0, 2)
+        watchfont.showSorobanNumber(rtc.getClockData(clockData.minute), 3, 2)
     }
     ボタン番号()
     if (buttonNo == 1) {
