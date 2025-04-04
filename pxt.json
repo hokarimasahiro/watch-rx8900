@@ -7,7 +7,7 @@
         "microphone": "*",
         "pxt-rx8900": "github:hokarimasahiro/pxt-rx8900#2cbb48999a93a0f58ded10880b5fa97867841779",
         "neopixel": "github:microsoft/pxt-neopixel#v0.7.6",
-        "pxt-watchfont": "github:hokarimasahiro/pxt-watchfont#cf8c8fa5ae14fd43a48526edacc3f94c0537ada8"
+        "pxt-watchfont": "github:hokarimasahiro/pxt-watchfont#7e0d1d16a80a17bcaa53c1b24a1d068aedf482eb"
     },
     "files": [
         "main.blocks",
