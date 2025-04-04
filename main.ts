@@ -97,6 +97,7 @@ function 時計処理 () {
         basic.pause(800)
     }
     if (input.buttonIsPressed(Button.A)) {
+        basic.clearScreen()
         時刻表示(1)
     } else if (input.buttonIsPressed(Button.B)) {
         秒表示()
