@@ -101,10 +101,11 @@ function 時計処理 () {
         時刻表示(1)
     } else if (input.buttonIsPressed(Button.B)) {
         秒表示()
-    } else if (input.isGesture(Gesture.Shake)) {
+    } else if (input.logoIsPressed()) {
         時刻表示(0)
     } else {
         basic.clearScreen()
+        表示方向()
         watchfont.showSorobanNumber(rtc.getClockData(clockData.hour), 0, 2)
         watchfont.showSorobanNumber(rtc.getClockData(clockData.minute), 3, 2)
     }
