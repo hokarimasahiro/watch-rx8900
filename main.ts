@@ -90,6 +90,11 @@ function ボタン番号 () {
 function 時計処理 () {
     basic.pause(100)
     rtc.getClock()
+    if (saveSecond != rtc.getClockData(clockData.second)) {
+        saveSecond = rtc.getClockData(clockData.second)
+        saveMillisecond = input.runningTime()
+    }
+    milliSecond = input.runningTime() - saveMillisecond
     if (rtc.getClockData(clockData.minute) == 0 && rtc.getClockData(clockData.second) == 0) {
         pins.digitalWritePin(DigitalPin.P2, 1)
         basic.pause(200)
@@ -104,10 +109,28 @@ function 時計処理 () {
     } else if (input.logoIsPressed()) {
         時刻表示(0)
     } else {
-        basic.clearScreen()
         表示方向()
+        for (let カウンター = 0; カウンター <= 4; カウンター++) {
+            watchfont.unplot(2, カウンター)
+        }
         watchfont.showSorobanNumber(rtc.getClockData(clockData.hour), 0, 2)
         watchfont.showSorobanNumber(rtc.getClockData(clockData.minute), 3, 2)
+        if (milliSecond < 500) {
+            if (rtc.getClockData(clockData.second) >= 50) {
+                watchfont.plot(2, 0)
+            } else if (rtc.getClockData(clockData.second) >= 40) {
+                watchfont.plot(2, 1)
+            } else if (rtc.getClockData(clockData.second) >= 30) {
+                watchfont.plot(2, 2)
+            } else if (rtc.getClockData(clockData.second) >= 20) {
+                watchfont.plot(2, 3)
+            } else if (rtc.getClockData(clockData.second) >= 10) {
+                watchfont.plot(2, 4)
+            } else {
+                watchfont.plot(2, 1)
+                watchfont.plot(2, 3)
+            }
+        }
     }
     ボタン番号()
     if (buttonNo == 1) {
@@ -121,6 +144,7 @@ function 時計初期化 () {
     pins.setPull(DigitalPin.P13, PinPullMode.PullUp)
     LED初期化()
     rtc.getClock()
+    saveSecond = rtc.getClockData(clockData.second)
     時刻表示(0)
 }
 serial.onDataReceived(serial.delimiters(Delimiters.NewLine), function () {
@@ -217,6 +241,9 @@ function 時刻表示 (タイプ: number) {
     時刻送信()
     if (タイプ == 0) {
         表示方向()
+        for (let カウンター = 0; カウンター <= 4; カウンター++) {
+            watchfont.unplot(2, カウンター)
+        }
         watchfont.showNumber2(rtc.getClockData(clockData.hour))
         basic.pause(1000)
         basic.clearScreen()
@@ -231,6 +258,9 @@ function 時刻表示 (タイプ: number) {
 }
 let 受信文字: string[] = []
 let シリアルデータ = ""
+let milliSecond = 0
+let saveMillisecond = 0
+let saveSecond = 0
 let buttonNo = 0
 let color: number[] = []
 let X = 0
