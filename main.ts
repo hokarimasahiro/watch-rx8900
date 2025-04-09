@@ -1,21 +1,54 @@
-function LED消灯 () {
-    strip.showColor(neopixel.colors(NeoPixelColors.Black))
+function soundRecvProc (recvData: string) {
+    if (recvData.includes("A")) {
+        plotLED()
+        watchfont.showIcon(
+        "01110",
+        "10001",
+        "11111",
+        "10001",
+        "10001"
+        )
+        vibration()
+        clearLED()
+    } else if (recvData.includes("B")) {
+        plotLED()
+        watchfont.showIcon(
+        "11110",
+        "10001",
+        "11110",
+        "10001",
+        "11110"
+        )
+        vibration()
+        clearLED()
+    }
+}
+function vibration () {
+    pins.digitalWritePin(DigitalPin.P2, 1)
+    basic.pause(200)
+    pins.digitalWritePin(DigitalPin.P2, 0)
+}
+function controllerInit () {
+    radioGroup = Math.abs(control.deviceSerialNumber()) % 98 + 1
+    watchfont.showNumber2(radioGroup)
+    radio.setTransmitPower(7)
+    ledInit()
+}
+function rtcSettingProc (timeData: string[]) {
+    rtc.setClockData(clockData.year, parseFloat(timeData[1]))
+    rtc.setClockData(clockData.month, parseFloat(timeData[2]))
+    rtc.setClockData(clockData.day, parseFloat(timeData[3]))
+    rtc.setClockData(clockData.hour, parseFloat(timeData[4]))
+    rtc.setClockData(clockData.minute, parseFloat(timeData[5]))
+    rtc.setClockData(clockData.second, parseFloat(timeData[6]))
+    rtc.setClock()
+}
+function plotLED () {
+    strip.showColor(neopixel.colors(NeoPixelColors.Orange))
     strip.show()
 }
-function 時刻送信 () {
-    rtc.getClock()
-    serial.writeNumbers([
-    rtc.getClockData(clockData.year),
-    rtc.getClockData(clockData.month),
-    rtc.getClockData(clockData.day),
-    rtc.getClockData(clockData.weekday),
-    rtc.getClockData(clockData.hour),
-    rtc.getClockData(clockData.minute),
-    rtc.getClockData(clockData.second)
-    ])
-}
-function コントローラ処理 () {
-    radio.setGroup(無線グループ)
+function controllerProc () {
+    radio.setGroup(radioGroup)
     if (input.buttonIsPressed(Button.A)) {
         Y = Math.constrain(input.rotation(Rotation.Pitch) * -10, -512, 512)
         X = Math.constrain(input.rotation(Rotation.Roll) * 10, -512, 512)
@@ -24,23 +57,68 @@ function コントローラ処理 () {
         Y = 0
     }
     radio.sendString("$," + X + "," + Y)
-    ボタン番号()
+    getButtonNo()
     strip.showColor(color[buttonNo])
     strip.show()
     radio.sendNumber(buttonNo)
     radio.setGroup(0)
     basic.pause(50)
 }
-function 時計設定 (データ: string[]) {
-    rtc.setClockData(clockData.year, parseFloat(データ[1]))
-    rtc.setClockData(clockData.month, parseFloat(データ[2]))
-    rtc.setClockData(clockData.day, parseFloat(データ[3]))
-    rtc.setClockData(clockData.hour, parseFloat(データ[4]))
-    rtc.setClockData(clockData.minute, parseFloat(データ[5]))
-    rtc.setClockData(clockData.second, parseFloat(データ[6]))
-    rtc.setClock()
+function clockProc () {
+    basic.pause(100)
+    rtc.getClock()
+    if (saveSecond != rtc.getClockData(clockData.second)) {
+        saveSecond = rtc.getClockData(clockData.second)
+        saveMillisecond = input.runningTime()
+    }
+    milliSecond = input.runningTime() - saveMillisecond
+    if (rtc.getClockData(clockData.minute) == 0 && rtc.getClockData(clockData.second) == 0) {
+        pins.digitalWritePin(DigitalPin.P2, 1)
+        basic.pause(200)
+        pins.digitalWritePin(DigitalPin.P2, 0)
+        basic.pause(800)
+    }
+    if (input.buttonIsPressed(Button.A)) {
+        basic.clearScreen()
+        diplayTime(1)
+    } else if (input.buttonIsPressed(Button.B)) {
+        displaySecondData()
+    } else if (input.logoIsPressed()) {
+        diplayTime(1)
+    } else {
+        rotateDisplay()
+        for (let counter = 0; counter <= 4; counter++) {
+            watchfont.unplot(2, counter)
+        }
+        watchfont.showSorobanNumber(rtc.getClockData(clockData.hour), 0, 2)
+        watchfont.showSorobanNumber(rtc.getClockData(clockData.minute), 3, 2)
+        if (milliSecond < 500) {
+            if (rtc.getClockData(clockData.second) >= 50) {
+                watchfont.plot(2, 0)
+            } else if (rtc.getClockData(clockData.second) >= 40) {
+                watchfont.plot(2, 1)
+            } else if (rtc.getClockData(clockData.second) >= 30) {
+                watchfont.plot(2, 2)
+            } else if (rtc.getClockData(clockData.second) >= 20) {
+                watchfont.plot(2, 3)
+            } else if (rtc.getClockData(clockData.second) >= 10) {
+                watchfont.plot(2, 4)
+            } else {
+                watchfont.plot(2, 1)
+                watchfont.plot(2, 3)
+            }
+        }
+    }
+    getButtonNo()
+    if (buttonNo == 1) {
+        sendTimeData()
+    }
 }
-function 音通信処理 () {
+function clearLED () {
+    strip.showColor(neopixel.colors(NeoPixelColors.Black))
+    strip.show()
+}
+function soundProc () {
     if (input.buttonIsPressed(Button.A)) {
         radio.sendString("A")
         while (input.buttonIsPressed(Button.A)) {
@@ -68,11 +146,72 @@ function 音通信処理 () {
         }
     }
 }
-function 音通信初期化 () {
-    radio.setGroup(33)
-    LED初期化()
+function diplayTime (displayType: number) {
+    sendTimeData()
+    if (displayType == 0) {
+        rotateDisplay()
+        for (let counter = 0; counter <= 4; counter++) {
+            watchfont.unplot(2, counter)
+        }
+        watchfont.showNumber2(rtc.getClockData(clockData.hour))
+        basic.pause(1000)
+        basic.clearScreen()
+        basic.pause(200)
+        watchfont.showNumber2(rtc.getClockData(clockData.minute))
+        basic.pause(1000)
+        basic.clearScreen()
+        basic.pause(500)
+    } else if (displayType == 1) {
+        basic.showString("" + rtc.getClockData(clockData.hour) + ":" + rtc.getClockData(clockData.minute))
+    }
 }
-function ボタン番号 () {
+function sountInit () {
+    radio.setGroup(33)
+    ledInit()
+}
+serial.onDataReceived(serial.delimiters(Delimiters.NewLine), function () {
+    serialData = serial.readUntil(serial.delimiters(Delimiters.NewLine))
+    if (serialData.charAt(0) == "g") {
+        sendTimeData()
+    } else if (serialData.charAt(0) == "s") {
+        rtcSettingProc(serialData.split(","))
+    }
+})
+function rotateDisplay () {
+    if (input.rotation(Rotation.Pitch) <= -40) {
+        watchfont.setRotatation(rotate.under)
+    } else {
+        watchfont.setRotatation(rotate.top)
+    }
+    if (input.rotation(Rotation.Roll) < -75) {
+        watchfont.setRotatation(rotate.right)
+    } else if (input.rotation(Rotation.Roll) > 75) {
+        watchfont.setRotatation(rotate.left)
+    }
+}
+function clockINit () {
+    pins.digitalWritePin(DigitalPin.P2, 0)
+    pins.setPull(DigitalPin.P8, PinPullMode.PullUp)
+    pins.setPull(DigitalPin.P12, PinPullMode.PullUp)
+    pins.setPull(DigitalPin.P13, PinPullMode.PullUp)
+    ledInit()
+    rtc.getClock()
+    saveSecond = rtc.getClockData(clockData.second)
+    diplayTime(1)
+}
+radio.onReceivedString(function (receivedString) {
+    if (TYPE == 1) {
+        if (radio.receivedPacket(RadioPacketProperty.SignalStrength) >= -70) {
+            recvData = receivedString.split(",")
+            if (recvData[0] == "CQ") {
+                radio.sendString("" + recvData[1] + "," + control.deviceName() + "," + convertToText(radioGroup))
+            }
+        }
+    } else if (TYPE == 2) {
+        soundRecvProc(receivedString)
+    }
+})
+function getButtonNo () {
     buttonNo = 0
     if (pins.digitalReadPin(DigitalPin.P8) == 0) {
         buttonNo += 1
@@ -87,143 +226,7 @@ function ボタン番号 () {
         buttonNo = 6
     }
 }
-function 時計処理 () {
-    basic.pause(100)
-    rtc.getClock()
-    if (saveSecond != rtc.getClockData(clockData.second)) {
-        saveSecond = rtc.getClockData(clockData.second)
-        saveMillisecond = input.runningTime()
-    }
-    milliSecond = input.runningTime() - saveMillisecond
-    if (rtc.getClockData(clockData.minute) == 0 && rtc.getClockData(clockData.second) == 0) {
-        pins.digitalWritePin(DigitalPin.P2, 1)
-        basic.pause(200)
-        pins.digitalWritePin(DigitalPin.P2, 0)
-        basic.pause(800)
-    }
-    if (input.buttonIsPressed(Button.A)) {
-        basic.clearScreen()
-        時刻表示(1)
-    } else if (input.buttonIsPressed(Button.B)) {
-        秒表示()
-    } else if (input.logoIsPressed()) {
-        時刻表示(0)
-    } else {
-        表示方向()
-        for (let カウンター = 0; カウンター <= 4; カウンター++) {
-            watchfont.unplot(2, カウンター)
-        }
-        watchfont.showSorobanNumber(rtc.getClockData(clockData.hour), 0, 2)
-        watchfont.showSorobanNumber(rtc.getClockData(clockData.minute), 3, 2)
-        if (milliSecond < 500) {
-            if (rtc.getClockData(clockData.second) >= 50) {
-                watchfont.plot(2, 0)
-            } else if (rtc.getClockData(clockData.second) >= 40) {
-                watchfont.plot(2, 1)
-            } else if (rtc.getClockData(clockData.second) >= 30) {
-                watchfont.plot(2, 2)
-            } else if (rtc.getClockData(clockData.second) >= 20) {
-                watchfont.plot(2, 3)
-            } else if (rtc.getClockData(clockData.second) >= 10) {
-                watchfont.plot(2, 4)
-            } else {
-                watchfont.plot(2, 1)
-                watchfont.plot(2, 3)
-            }
-        }
-    }
-    ボタン番号()
-    if (buttonNo == 1) {
-        時刻送信()
-    }
-}
-function 時計初期化 () {
-    pins.digitalWritePin(DigitalPin.P2, 0)
-    pins.setPull(DigitalPin.P8, PinPullMode.PullUp)
-    pins.setPull(DigitalPin.P12, PinPullMode.PullUp)
-    pins.setPull(DigitalPin.P13, PinPullMode.PullUp)
-    LED初期化()
-    rtc.getClock()
-    saveSecond = rtc.getClockData(clockData.second)
-    時刻表示(0)
-}
-serial.onDataReceived(serial.delimiters(Delimiters.NewLine), function () {
-    シリアルデータ = serial.readUntil(serial.delimiters(Delimiters.NewLine))
-    if (シリアルデータ.charAt(0) == "g") {
-        時刻送信()
-    } else if (シリアルデータ.charAt(0) == "s") {
-        時計設定(シリアルデータ.split(","))
-    }
-})
-function LED表示 () {
-    strip.showColor(neopixel.colors(NeoPixelColors.Orange))
-    strip.show()
-}
-function 表示方向 () {
-    if (input.rotation(Rotation.Pitch) <= -40) {
-        watchfont.setRotatation(rotate.under)
-    } else {
-        watchfont.setRotatation(rotate.top)
-    }
-    if (input.rotation(Rotation.Roll) < -75) {
-        watchfont.setRotatation(rotate.right)
-    } else if (input.rotation(Rotation.Roll) > 75) {
-        watchfont.setRotatation(rotate.left)
-    }
-}
-function 音通信受信処理 (受信データ: string) {
-    if (受信データ.includes("A")) {
-        LED表示()
-        watchfont.showIcon(
-        "01110",
-        "10001",
-        "11111",
-        "10001",
-        "10001"
-        )
-        バイブレーション()
-        LED消灯()
-    } else if (受信データ.includes("B")) {
-        LED表示()
-        watchfont.showIcon(
-        "11110",
-        "10001",
-        "11110",
-        "10001",
-        "11110"
-        )
-        バイブレーション()
-        LED消灯()
-    }
-}
-radio.onReceivedString(function (receivedString) {
-    if (TYPE == 1) {
-        if (radio.receivedPacket(RadioPacketProperty.SignalStrength) >= -70) {
-            受信文字 = receivedString.split(",")
-            if (受信文字[0] == "CQ") {
-                radio.sendString("" + 受信文字[1] + "," + control.deviceName() + "," + convertToText(無線グループ))
-            }
-        }
-    } else if (TYPE == 2) {
-        音通信受信処理(receivedString)
-    }
-})
-function バイブレーション () {
-    pins.digitalWritePin(DigitalPin.P2, 1)
-    basic.pause(200)
-    pins.digitalWritePin(DigitalPin.P2, 0)
-}
-function 秒表示 () {
-    表示方向()
-    watchfont.showNumber2(rtc.getClockData(clockData.second))
-}
-function コントローラ初期化 () {
-    無線グループ = Math.abs(control.deviceSerialNumber()) % 98 + 1
-    watchfont.showNumber2(無線グループ)
-    radio.setTransmitPower(7)
-    LED初期化()
-}
-function LED初期化 () {
+function ledInit () {
     strip = neopixel.create(DigitalPin.P1, 4, NeoPixelMode.RGB)
     strip.setBrightness(32)
     color = [
@@ -237,27 +240,24 @@ function LED初期化 () {
     neopixel.colors(NeoPixelColors.Orange)
     ]
 }
-function 時刻表示 (タイプ: number) {
-    時刻送信()
-    if (タイプ == 0) {
-        表示方向()
-        for (let カウンター = 0; カウンター <= 4; カウンター++) {
-            watchfont.unplot(2, カウンター)
-        }
-        watchfont.showNumber2(rtc.getClockData(clockData.hour))
-        basic.pause(1000)
-        basic.clearScreen()
-        basic.pause(200)
-        watchfont.showNumber2(rtc.getClockData(clockData.minute))
-        basic.pause(1000)
-        basic.clearScreen()
-        basic.pause(500)
-    } else if (タイプ == 1) {
-        basic.showString("" + rtc.getClockData(clockData.hour) + ":" + rtc.getClockData(clockData.minute))
-    }
+function displaySecondData () {
+    rotateDisplay()
+    watchfont.showNumber2(rtc.getClockData(clockData.second))
 }
-let 受信文字: string[] = []
-let シリアルデータ = ""
+function sendTimeData () {
+    rtc.getClock()
+    serial.writeNumbers([
+    rtc.getClockData(clockData.year),
+    rtc.getClockData(clockData.month),
+    rtc.getClockData(clockData.day),
+    rtc.getClockData(clockData.weekday),
+    rtc.getClockData(clockData.hour),
+    rtc.getClockData(clockData.minute),
+    rtc.getClockData(clockData.second)
+    ])
+}
+let recvData: string[] = []
+let serialData = ""
 let milliSecond = 0
 let saveMillisecond = 0
 let saveSecond = 0
@@ -265,8 +265,8 @@ let buttonNo = 0
 let color: number[] = []
 let X = 0
 let Y = 0
-let 無線グループ = 0
 let strip: neopixel.Strip = null
+let radioGroup = 0
 let TYPE = 0
 pins.digitalWritePin(DigitalPin.P2, 0)
 pins.setPull(DigitalPin.P5, PinPullMode.PullUp)
@@ -281,19 +281,19 @@ while (pins.digitalReadPin(DigitalPin.P5) == 0 || pins.digitalReadPin(DigitalPin
 	
 }
 if (TYPE == 1) {
-    コントローラ初期化()
+    controllerInit()
 } else if (TYPE == 2) {
-    音通信初期化()
+    sountInit()
 } else {
-    時計初期化()
+    clockINit()
 }
 serial.redirectToUSB()
 basic.forever(function () {
     if (TYPE == 1) {
-        コントローラ処理()
+        controllerProc()
     } else if (TYPE == 2) {
-        音通信処理()
+        soundProc()
     } else {
-        時計処理()
+        clockProc()
     }
 })
